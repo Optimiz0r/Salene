@@ -1,0 +1,31 @@
+# MCP Server Configuration for Neurobit Test Harness
+# Add to ~/.hermes/config.yaml under 'mcp_servers:' key
+
+mcp_servers:
+  # Voice Input Organ - Speech to Text
+  voice_input:
+    command: "docker"
+    args: ["run", "-i", "--rm", "neurobit-voice-input:latest"]
+    env: {}
+    timeout: 30
+    
+  # Vision Organ - Image analysis and face detection
+  vision_organ:
+    command: "docker"
+    args: ["run", "-i", "--rm", "neurobit-vision-organ:latest"]
+    env: {}
+    timeout: 60
+    
+  # Memory Organ - Episodic/semantic memory
+  memory_organ:
+    command: "docker"
+    args: ["run", "-i", "--rm", "neurobit-memory-organ:latest"]
+    env: {}
+    timeout: 120
+
+  # Example: External API via HTTP
+  external_analysis:
+    url: "http://localhost:8080/mcp"
+    headers:
+      Authorization: "Bearer your-token"
+    timeout: 60
