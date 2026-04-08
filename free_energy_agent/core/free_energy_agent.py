@@ -1112,6 +1112,14 @@ class FreeEnergyAgent:
                 'reasoning': self.reasoning,
                 'exploration': self.exploration,
             },
+            # PHASE 2: Perceived aliveness persistence
+            'perceived_aliveness': {
+                'last_proactive_time': self.last_proactive_time.isoformat() if self.last_proactive_time else None,
+                'last_memory_surface': self.last_memory_surface.isoformat() if self.last_memory_surface else None,
+                'allostatic_load': self.allostatic_load,
+                'is_resting': self.is_resting,
+                'rest_until': self.rest_until,
+            },
         }
         
         with open(filepath, 'w') as f:
@@ -1214,6 +1222,16 @@ class FreeEnergyAgent:
         else:
             agent._return_gap = None
             agent._return_idle_cycles = 0
+        
+        # Restore Phase 2 perceived aliveness data
+        pa_data = state_dict.get('perceived_aliveness', {})
+        if pa_data.get('last_proactive_time'):
+            agent.last_proactive_time = datetime.fromisoformat(pa_data['last_proactive_time'])
+        if pa_data.get('last_memory_surface'):
+            agent.last_memory_surface = datetime.fromisoformat(pa_data['last_memory_surface'])
+        agent.allostatic_load = pa_data.get('allostatic_load', 0.0)
+        agent.is_resting = pa_data.get('is_resting', False)
+        agent.rest_until = pa_data.get('rest_until', None)
         
         from datetime import datetime
         agent.last_active = datetime.now()
