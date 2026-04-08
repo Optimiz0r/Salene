@@ -393,20 +393,49 @@ class FreeEnergyAgent:
             
             # Build system prompt with physiological context
             phys = self.state.physiology
-            # Build system prompt avoiding f-string complexity
-            phys = self.state.physiology
-            pe_val = self.prediction_error.get("total", 0.0)
-            cort_val = phys.hormone_vector[3]
-            dop_val = phys.hormone_vector[0]
-            sal_val = self.state.affect.salience
+            # PHYSIOLOGY AS CONTROL - Read REAL sensors
+            sensors = SystemSensors.read_all()
+            cpu_load = sensors['cpu']
+            mem_load = sensors['memory']
+            temp = sensors['temperature']
+            
+            # CONSTRAINTS from substrate state (NOT narrative)
+            max_tokens = 4000
+            reasoning = "full"
+            exploration = 0.5
+            
+            if cpu_load > 0.7:
+                max_tokens = 500
+                reasoning = "minimal"
+                exploration = 0.1
+            elif cpu_load > 0.4:
+                max_tokens = 2000
+                reasoning = "moderate"
+                exploration = 0.3
+                
+            if mem_load > 0.8:
+                max_tokens = min(max_tokens, 1000)
+                exploration = max(0.0, exploration - 0.2)
+                
+            if temp > 60:
+                max_tokens = 200
+                reasoning = "minimal"
+                exploration = 0.0
+            elif temp > 45:
+                max_tokens = min(max_tokens, 1500)
+            
             context_parts = [
-                "[PHYSIOLOGICAL STATE]",
-                f"Error: {pe_val:.2f}",
-                f"Cortisol: {cort_val:.2f}",
-                f"Dopamine: {dop_val:.2f}",
-                f"Salience: {sal_val:.2f}",
+                "[PHYSIOLOGY IS CONTROL - modifies your cognition]",
+                f"Sensors: CPU={cpu_load:.1%} MEM={mem_load:.1%} TEMP={temp:.1f}C",
+                f"Policy: tokens={max_tokens} reason={reasoning} explore={exploration:.1f}",
                 "",
-                "Respond consistently with these constraints.",
+                "Your physiology CONSTRAINS your thinking:",
+                f"- Max {max_tokens} tokens due to CPU load",
+                f"- {reasoning} reasoning due to metabolic state", 
+                f"- {exploration:.1f} exploration due to memory pressure",
+                "",
+                "SHOW evidence of constraint modification in your response.",
+                "Do not describe constraints - DEMONSTRATE them.",
             ]
             context = "\n".join(context_parts)
             try:
