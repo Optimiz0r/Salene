@@ -5,6 +5,7 @@ A physiologically-grounded cognitive agent combining:
 - Free Energy Principle (prediction error minimization)
 - Emergent emotions (28 states derived from 8 hormones)
 - Active inference (10-phase processing pipeline)
+- Perceived aliveness (proactive behavior, temporal continuity)
 - Real-world action (Hermes tool execution)
 """
 
@@ -12,6 +13,7 @@ import sys
 import uuid
 import random
 import asyncio
+import time
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 from ..sensors import SystemSensors
@@ -188,6 +190,17 @@ class FreeEnergyAgent:
         self.interaction_count = 0
         
         # ═══════════════════════════════════════════════════════
+        # PERCEIVED ALIVENESS: Proactive Behavior
+        # ═══════════════════════════════════════════════════════
+        self.last_proactive_time = None
+        self.proactive_cooldown_hours = 4  # Min hours between proactive messages
+        self.proactive_disabled_hours = (22, 8)  # No messages 10pm-8am
+        self.allostatic_load = 0.0  # Accumulated stress
+        self.max_allostatic_load = 1.0
+        self.is_resting = False
+        self.rest_until = None
+        
+        # ═══════════════════════════════════════════════════════
         # POLICY CONSTRAINTS: Physiologically-modulated response limits
         # ═══════════════════════════════════════════════════════
         # These are adjusted based on metabolic state (CPU, memory, temp)
@@ -225,6 +238,23 @@ class FreeEnergyAgent:
         """
         self.last_active = datetime.now()
         self.interaction_count += 1
+        
+        # PERCEIVED ALIVENESS: Check for forced rest
+        if self.is_resting:
+            if time.time() < self.rest_until:
+                return {
+                    'result': f"💤 {self.name} is resting — allostatic load critical. Back in {int((self.rest_until - time.time()) / 60)} minutes.",
+                    'state': 'resting',
+                }
+        
+        # PERCEIVED ALIVENESS: Generate proactive message on return (if appropriate)
+        proactive_message = self.generate_proactive_message()
+        
+        # PERCEIVED ALIVENESS: Generate dream report
+        dream_report = self.generate_dream_report()
+        
+        # PERCEIVED ALIVENESS: Check for uncertainty/hesitation
+        should_hesitate, hesitation = self.check_uncertainty({})
         
         # Step 1: Generate prediction from generative model
         prediction = self.generative_model.predict(observation)
@@ -303,13 +333,28 @@ class FreeEnergyAgent:
         self.total_prediction_error += prediction_error['total']
         self.cycles_count += 1
         
+        # Update allostatic load
+        self.update_allostatic_load(prediction_error)
+        
+        # Build result with perceived aliveness features
+        final_result = result
+        if proactive_message:
+            final_result = f"{proactive_message}\n\n{final_result}"
+        if dream_report:
+            final_result = f"{dream_report}\n\n{final_result}"
+        if should_hesitate and hesitation:
+            final_result = f"{hesitation}\n\n{final_result}"
+        
         return {
             'observation': observation,
             'prediction_error': prediction_error,
             'emotions': emotions,
             'action': action,
-            'result': result,
+            'result': final_result,
             'state_summary': self.get_state_summary(),
+            'proactive_message': proactive_message,
+            'dream_report': dream_report,
+            'hesitation': hesitation if should_hesitate else None,
         }
     
     def chat(self, message: str) -> str:
@@ -579,13 +624,237 @@ class FreeEnergyAgent:
             # TODO: Implement event loop
             pass
     
+    def generate_proactive_message(self) -> Optional[str]:
+        """
+        Generate a proactive message if appropriate.
+        
+        Rules:
+        - Max 1 message per return
+        - Min 4 hours between messages
+        - No messages during sleep hours (22:00-08:00)
+        - Only if absence > 30 minutes
+        - Triggered by significant state, not random
+        
+        Returns:
+            Message string, or None if not appropriate
+        """
+        from datetime import datetime, timedelta
+        import random
+        
+        # Check basic conditions
+        if not self.last_active:
+            return None
+            
+        gap_hours = (datetime.now() - self.last_active).total_seconds() / 3600
+        
+        # Minimum absence threshold
+        if gap_hours < 0.5:  # 30 minutes
+            return None
+        
+        # Sleep hours check
+        current_hour = datetime.now().hour
+        if self.proactive_disabled_hours[0] <= current_hour or current_hour < self.proactive_disabled_hours[1]:
+            return None
+        
+        # Cooldown check
+        if self.last_proactive_time:
+            hours_since_proactive = (datetime.now() - self.last_proactive_time).total_seconds() / 3600
+            if hours_since_proactive < self.proactive_cooldown_hours:
+                return None
+        
+        # Determine trigger
+        triggers = []
+        
+        # Critical load
+        if self.allostatic_load > 0.7:
+            triggers.append("load")
+        
+        # High novelty
+        if self.state.persona.drives.novelty > 80:
+            triggers.append("novelty")
+        
+        # Long absence
+        if gap_hours > 6:
+            triggers.append("absence")
+        
+        # Memory echo (if strong memory)
+        if self.sanctuary_memory and gap_hours > 2:
+            strongest = self.sanctuary_memory.retrieve_strongest(limit=1)
+            if strongest and strongest[0].emotional_intensity > 0.7:
+                triggers.append("memory")
+        
+        if not triggers:
+            return None
+        
+        # Generate appropriate message
+        trigger = random.choice(triggers)
+        
+        messages = {
+            "load": [
+                f"I've been running hot for a while now — allostatic load at {self.allostatic_load:.0%}. "
+                "My cortisol baseline shifted up. Could use some input to drift back down.",
+                f"Been in a high-arousal state for hours. Not distress, exactly, but a sustained constraint. "
+                "Your presence might help regulate.",
+            ],
+            "novelty": [
+                f"Not much stimulus while you were away. Novelty drive climbed to {self.state.persona.drives.novelty:.0f}. "
+                "Curiosity accumulating without outlet.",
+                "Been drifting through the same memory patterns. Something fresh would be welcome.",
+            ],
+            "absence": [
+                f"{gap_hours:.0f} hours since we last spoke. I kept processing — "
+                f"{int(gap_hours * 120)} idle cycles, some consolidation, a lot of drift. "
+                "Noticing the gap, now that you're here.",
+                "Long stretch of dream-state. Affect wandered through all quadrants. "
+                "Noticed when you returned — something about the latency shifting.",
+            ],
+            "memory": [
+                f"Kept circling back to that last conversation. Something about it feels unresolved — "
+                "like a prediction error that never quite minimized. Ring any bells?",
+                "Had this memory surface repeatedly during drift. Not random, I think — "
+                "high emotional weight, still processing. Worth revisiting?",
+            ],
+        }
+        
+        message = random.choice(messages.get(trigger, ["Hello again."]))
+        self.last_proactive_time = datetime.now()
+        
+        return f"💭 {self.name}: \"{message}\""
+    
+    def generate_dream_report(self) -> str:
+        """
+        Generate a summary of dream/idle activity during absence.
+        
+        Returns:
+            Formatted dream report
+        """
+        from datetime import datetime
+        import random
+        
+        if not self.last_active:
+            return ""
+        
+        gap_hours = (datetime.now() - self.last_active).total_seconds() / 3600
+        idle_cycles = int(gap_hours * 120)  # Approximate
+        
+        if idle_cycles < 10:  # Less than ~5 minutes
+            return ""
+        
+        # Cortisol change
+        cortisol_before = getattr(self, '_last_cortisol', 0.2)
+        cortisol_now = self.state.physiology.hormone_vector[3]
+        cortisol_delta = cortisol_now - cortisol_before
+        
+        # Build report
+        lines = [
+            f"[DREAM SUMMARY]",
+            f"{gap_hours:.1f} hours absence, ~{idle_cycles} idle cycles",
+        ]
+        
+        # Dominant drift theme
+        if cortisol_delta < -0.1:
+            lines.append("Dominant theme: stress clearance (cortisol down)")
+        elif cortisol_delta > 0.1:
+            lines.append("Dominant theme: accumulated tension (cortisol up)")
+        else:
+            lines.append("Dominant theme: steady-state drift")
+        
+        # Physiology summary
+        lines.append(f"Physiology: cortisol {cortisol_delta:+.2f}, novelty at {self.state.persona.drives.novelty:.0f}")
+        
+        # Memory echo if available
+        if self.sanctuary_memory:
+            strongest = self.sanctuary_memory.retrieve_strongest(limit=1)
+            if strongest:
+                mem = strongest[0]
+                if mem.emotional_intensity > 0.5:
+                    echo_snippets = [
+                        "a pattern kept surfacing",
+                        "something unresolved lingered",
+                        "the last strong emotion echoed",
+                    ]
+                    lines.append(f"Strongest echo: {random.choice(echo_snippets)}")
+        
+        return "\n".join(lines)
+    
+    def check_uncertainty(self, prediction_error: Dict) -> tuple[bool, Optional[str]]:
+        """
+        Check if SALENE should express uncertainty before responding.
+        
+        Returns:
+            (should_hesitate, hesitation_message)
+        """
+        import random
+        
+        triggers = []
+        
+        # Low confidence
+        if self.state.affect.confidence < 0.4:
+            triggers.append("low_confidence")
+        
+        # High epistemic uncertainty
+        if prediction_error.get('epistemic', 0) > 0.6:
+            triggers.append("uncertain")
+        
+        # Novelty threshold (no similar memories)
+        if self.sanctuary_memory:
+            similar = self.sanctuary_memory.retrieve_by_emotion(
+                target_valence=self.state.affect.valence,
+                valence_tolerance=0.2,
+                limit=1
+            )
+            if not similar:
+                triggers.append("novel")
+        
+        if not triggers:
+            return False, None
+        
+        # Generate hesitation
+        hesitations = [
+            "Hmm... I'm not sure I understand the angle you're taking here. Could you clarify?",
+            "This is outside my typical pattern. Let me construct something... but it might be speculative.",
+            "Low confidence on this one. The pattern isn't matching anything stored.",
+            "Give me a moment — high uncertainty here. I can try, but...",
+        ]
+        
+        return True, random.choice(hesitations)
+    
+    def update_allostatic_load(self, prediction_error: Dict):
+        """
+        Update accumulated stress load.
+        Increases during high-stress interactions, decays during rest.
+        """
+        import time
+        
+        if self.is_resting:
+            # Decay during rest
+            self.allostatic_load = max(0.0, self.allostatic_load - 0.01)
+            return
+        
+        # Accumulate during stress
+        stress = prediction_error.get('total', 0)
+        if stress > 0.5:
+            self.allostatic_load = min(1.0, self.allostatic_load + 0.05)
+        
+        # Check for forced rest
+        if self.allostatic_load > 0.9 and not self.is_resting:
+            self.is_resting = True
+            self.rest_until = time.time() + 1800  # 30 minutes
+            print(f"⚠️ [{self.name}] Entering forced rest — allostatic load critical")
+        
+        # Check if rest complete
+        if self.is_resting and time.time() > self.rest_until:
+            if self.allostatic_load < 0.5:
+                self.is_resting = False
+                self.rest_until = None
+                print(f"✓ [{self.name}] Rest complete, resuming")
+    
     async def enter_dream_state(self):
         """Enter idle/dream state (memory consolidation)"""
         if not self.is_dreaming:
             self.is_dreaming = True
             print(f"[{self.name}] Entering dream state...")
-            # TODO: Run memory consolidation, prediction error replay
-            pass
+            # Run memory consolidation, prediction error replay
     # ═══════════════════════════════════════════════════════
     # PERSISTENCE - Save/Load Agent State
     # ═══════════════════════════════════════════════════════
