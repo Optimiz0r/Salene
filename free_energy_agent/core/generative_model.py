@@ -70,7 +70,7 @@ class GenerativeModel:
             'prediction': f"Input: {observation[:30]}...",
         }
     
-    def expected_valence(self) -> float:
+    def get_expected_valence(self) -> float:
         """Expected emotional valence"""
         return self.expected_valence
     

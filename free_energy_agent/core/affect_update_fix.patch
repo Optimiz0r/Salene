@@ -1,0 +1,21 @@
+--- a/free_energy_agent.py
++++ b/free_energy_agent.py
+@@ -333,9 +333,9 @@ class FreeEnergyAgent:
+         """
+         affect = self.state.affect
+ 
+-        # Prediction error affects valence
+-        # High error → negative valence (mismatch is unpleasant)
+-        # Low error → positive valence (match is pleasant)
++        # Prediction error affects ring point (which computes valence/arousal)
++        # High error → move toward negative valence (SW quadrant)
++        # Low error → move toward positive valence (NE quadrant)
+         error_impact = prediction_error['total'] * 0.3
+-        affect.valence = max(-1.0, min(1.0, affect.valence - error_impact))
++        # Update ring point x coordinate (valence)
++        current_x = affect.ring_point[0]
++        new_x = max(-1.0, min(1.0, current_x - error_impact))
++        affect.ring_point[0] = new_x
+ 
+         # Precision (confidence) drops with high error
+         # "I don't know what's happening"
