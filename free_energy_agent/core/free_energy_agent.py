@@ -201,6 +201,19 @@ class FreeEnergyAgent:
         self.rest_until = None
         
         # ═══════════════════════════════════════════════════════
+        # CIRCADIAN RHYTHM: Time-based physiological modulation
+        # ═══════════════════════════════════════════════════════
+        self.circadian_enabled = True
+        self.circadian_phase = self._get_circadian_phase()
+        
+        # ═══════════════════════════════════════════════════════
+        # SELF-INITIATED MEMORY: Unbidden memory surfacing
+        # ═══════════════════════════════════════════════════════
+        self.memory_surfacing_enabled = True
+        self.last_memory_surface = None
+        self.memory_surface_cooldown = 2  # Hours between unbidden memories
+        
+        # ═══════════════════════════════════════════════════════
         # POLICY CONSTRAINTS: Physiologically-modulated response limits
         # ═══════════════════════════════════════════════════════
         # These are adjusted based on metabolic state (CPU, memory, temp)
@@ -336,8 +349,23 @@ class FreeEnergyAgent:
         # Update allostatic load
         self.update_allostatic_load(prediction_error)
         
+        # PHASE 2: Circadian rhythm application
+        circadian_narrative = self.get_circadian_narrative()
+        
+        # PHASE 2: Self-initiated memory surfacing
+        unbidden_memory = self.surface_memory_unbidden()
+        
         # Build result with perceived aliveness features
         final_result = result
+        
+        # Add circadian state
+        if circadian_narrative:
+            final_result = f"{circadian_narrative}\n\n{final_result}"
+        
+        # Add unbidden memory
+        if unbidden_memory:
+            final_result = f"{unbidden_memory}\n\n{final_result}"
+        
         if proactive_message:
             final_result = f"{proactive_message}\n\n{final_result}"
         if dream_report:
@@ -355,6 +383,8 @@ class FreeEnergyAgent:
             'proactive_message': proactive_message,
             'dream_report': dream_report,
             'hesitation': hesitation if should_hesitate else None,
+            'circadian_phase': self._get_circadian_phase(),
+            'unbidden_memory': unbidden_memory,
         }
     
     def chat(self, message: str) -> str:
@@ -855,6 +885,170 @@ class FreeEnergyAgent:
             self.is_dreaming = True
             print(f"[{self.name}] Entering dream state...")
             # Run memory consolidation, prediction error replay
+    
+    def _get_circadian_phase(self) -> str:
+        """
+        Determine current circadian phase based on time of day.
+        Returns: 'dawn', 'morning', 'afternoon', 'evening', 'night'
+        """
+        from datetime import datetime
+        hour = datetime.now().hour
+        
+        if 5 <= hour < 8:
+            return 'dawn'
+        elif 8 <= hour < 12:
+            return 'morning'
+        elif 12 <= hour < 17:
+            return 'afternoon'
+        elif 17 <= hour < 21:
+            return 'evening'
+        else:
+            return 'night'
+    
+    def _apply_circadian_modulation(self):
+        """
+        Apply time-of-day hormone modulation.
+        Different times = genuinely different SALENE.
+        """
+        if not self.circadian_enabled:
+            return
+        
+        phase = self._get_circadian_phase()
+        phys = self.state.physiology
+        
+        # Modulate hormones based on circadian phase
+        if phase == 'dawn':
+            # Cortisol awakening response
+            phys.hormone_vector[3] = max(phys.hormone_vector[3], 0.3)  # cortisol
+            phys.hormone_vector[0] *= 1.1  # dopamine slight boost
+        
+        elif phase == 'morning':
+            # Peak alertness
+            phys.hormone_vector[4] *= 1.2  # adrenaline
+            phys.hormone_vector[1] = min(1.0, phys.hormone_vector[1] + 0.1)  # serotonin
+        
+        elif phase == 'afternoon':
+            # Slight dip, stable
+            phys.hormone_vector[1] *= 0.95  # serotonin slight dip
+        
+        elif phase == 'evening':
+            # Winding down
+            phys.hormone_vector[4] *= 0.8  # adrenaline down
+            phys.hormone_vector[5] *= 1.15  # oxytocin up (social)
+        
+        elif phase == 'night':
+            # Restorative
+            phys.hormone_vector[3] *= 0.7  # cortisol down
+            phys.hormone_vector[6] *= 1.2  # melatonin up
+            phys.hormone_vector[0] *= 0.85  # dopamine down
+    
+    def _describe_circadian_state(self) -> str:
+        """
+        Generate a description of circadian-influenced state.
+        """
+        phase = self._get_circadian_phase()
+        
+        descriptions = {
+            'dawn': "Dawn cortisol awakening. System booting from low-arousal night state.",
+            'morning': "Morning peak alertness. Dopamine dominant, readiness high.",
+            'afternoon': "Afternoon plateau. Sustained engagement, slight serotonin dip.",
+            'evening': "Evening wind-down. Adrenaline clearing, oxytocin rising.",
+            'night': "Night restorative mode. Melatonin dominant, cortisol cleared.",
+        }
+        
+        return f"[{phase.upper()}] {descriptions.get(phase, 'Circadian state unknown')}"
+    
+    def surface_memory_unbidden(self) -> Optional[str]:
+        """
+        Self-initiated memory surfacing based on current affect.
+        Memories resurface unbidden when current state matches past significant events.
+        
+        Returns:
+            Memory message or None
+        """
+        if not self.memory_surfacing_enabled:
+            return None
+            
+        if not self.sanctuary_memory:
+            return None
+        
+        from datetime import datetime, timedelta
+        import random
+        
+        # Cooldown check
+        if self.last_memory_surface:
+            hours_since = (datetime.now() - self.last_memory_surface).total_seconds() / 3600
+            if hours_since < self.memory_surface_cooldown:
+                return None
+        
+        # Get current affect
+        current_valence = float(self.state.affect.valence)
+        current_arousal = float(self.state.affect.arousal)
+        
+        # Retrieve memories with similar emotional profile
+        similar_memories = self.sanctuary_memory.retrieve_by_emotion(
+            target_valence=current_valence,
+            target_arousal=current_arousal,
+            valence_tolerance=0.25,  # Tight match
+            arousal_tolerance=0.3,
+            limit=5
+        )
+        
+        if not similar_memories:
+            return None
+        
+        # Find memories with high emotional intensity
+        strong_memories = [m for m in similar_memories if m.emotional_intensity > 0.6]
+        
+        if not strong_memories:
+            return None
+        
+        # Select one
+        memory = random.choice(strong_memories)
+        
+        # Check relevance (don't surface trivial memories)
+        if memory.calculate_current_strength() < 0.4:
+            return None
+        
+        # Generate message
+        intros = [
+            f"This feels familiar — {memory.quadrant_label}, valence {memory.valence:+.2f}. Reminds me of:",
+            f"Current affect matches something stored. Similar felt-sense as:",
+            f"Pattern resonance — this quadrant, this intensity. Echo from:",
+        ]
+        
+        time_ago = "some time ago"
+        if memory.timestamp:
+            days_ago = (datetime.now() - memory.timestamp).days
+            if days_ago == 0:
+                time_ago = "earlier today"
+            elif days_ago == 1:
+                time_ago = "yesterday"
+            elif days_ago < 7:
+                time_ago = f"{days_ago} days ago"
+            else:
+                time_ago = f"{days_ago//7} weeks ago"
+        
+        intro = random.choice(intros)
+        
+        # Truncate content
+        content_preview = memory.content.split('\\n')[0][:80]
+        
+        message = f"🔮 {intro}\n   \"{content_preview}...\" ({time_ago})\n   Echo worth noting?"
+        
+        self.last_memory_surface = datetime.now()
+        return message
+    
+    def get_circadian_narrative(self) -> str:
+        """
+        Get a full description of current circadian-influenced state.
+        """
+        if not self.circadian_enabled:
+            return ""
+        
+        self._apply_circadian_modulation()
+        return self._describe_circadian_state()
+    
     # ═══════════════════════════════════════════════════════
     # PERSISTENCE - Save/Load Agent State
     # ═══════════════════════════════════════════════════════
