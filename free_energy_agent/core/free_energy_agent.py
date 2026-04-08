@@ -394,14 +394,11 @@ class FreeEnergyAgent:
             # Build system prompt with physiological context
             phys = self.state.physiology
             # PHYSIOLOGY AS CONTROL - Read REAL sensors
-            sensors = SystemSensors.read_all()
-            cpu_load = sensors['cpu']
-            mem_load = sensors['memory']
-            temp = sensors['temperature']
-            
-            # CONSTRAINTS from substrate state (NOT narrative)
-            max_tokens = 4000
-            reasoning = "full"
+            # Use physiology state (may be real sensors or forced test values)
+            phys = self.state.physiology
+            cpu_load = phys.cpu_percent
+            mem_load = phys.memory_percent
+            temp = phys.temperature
             exploration = 0.5
             
             if cpu_load > 0.7:
