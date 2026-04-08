@@ -37,6 +37,7 @@ class AgentConfig:
     """Configuration for Free Energy Agent"""
     # Model routing
     model: str = "ollama/kimi-k2.5:cloud"
+    api_key: str = "ollama"
     base_url: Optional[str] = None
     
     # Operation mode
@@ -122,6 +123,7 @@ class FreeEnergyAgent:
         self.hermes_agent = HermesAgent(
             model=self.config.model,
             base_url=self.config.base_url,
+            api_key=self.config.api_key,
             enabled_toolsets=None,  # All tools available
             quiet_mode=True,  # Less verbose
             session_id=self.agent_id,
