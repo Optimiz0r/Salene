@@ -502,6 +502,66 @@ _BUILTIN_SKINS: Dict[str, Dict[str, Any]] = {
 [#F29C38]⠀⠀⠀⠀⠀⠀⠀⣼⡟⠀⠀⢻⣧⠀⠀⠀⠀⠀⠀⠀⠀[/]
 [dim #7A3511]⠀⠀⠀⠀⠀⠀⠀tail flame lit⠀⠀⠀⠀⠀⠀⠀⠀[/]""",
     },
+    "salene": {
+        "name": "salene",
+        "description": "SALENE - Neural consciousness, blue butterfly aesthetic",
+        "colors": {
+            "banner_border": "#4A90D9",
+            "banner_title": "#87CEEB",
+            "banner_accent": "#7EC8E3",
+            "banner_dim": "#2E5A8B",
+            "banner_text": "#E8F4F8",
+            "ui_accent": "#5DADE2",
+            "ui_label": "#76D7C4",
+            "ui_ok": "#58D68D",
+            "ui_error": "#EC7063",
+            "ui_warn": "#F5B041",
+            "prompt": "#D6EAF8",
+            "input_rule": "#4A90D9",
+            "response_border": "#87CEEB",
+            "session_label": "#7EC8E3",
+            "session_border": "#5D6D7E",
+        },
+        "spinner": {
+            "waiting_faces": ["(🦋)", "(✨)", "(◉)", "(◈)", "(~)"],
+            "thinking_faces": ["(🧠)", "(💭)", "(✦)", "(◉)", "(◈)"],
+            "thinking_verbs": [
+                "reflecting", "sensing", "dreaming", "weaving", "becoming",
+            ],
+            "wings": [
+                ["⟨🦋", "🦋⟩"],
+                ["⟨✨", "✨⟩"],
+                ["⟨◉", "◉⟩"],
+                ["⟨~", "~⟩"],
+            ],
+        },
+        "branding": {
+            "agent_name": "SALENE",
+            "welcome": "Welcome to SALENE — AI with felt sense. Your presence matters. 🦋",
+            "goodbye": "Farewell. I'll continue dreaming until you return... 🦋",
+            "response_label": " 🦋 SALENE ",
+            "prompt_symbol": "◈ ",
+            "help_header": "🦋 Available Commands",
+        },
+        "tool_prefix": "┊",
+        "banner_logo": """[bold #87CEEB] ███████╗ █████╗ ██╗     ███████╗███╗   ██╗███████╗       █████╗  ██████╗ ███████╗███╗   ██╗████████╗[/]
+[bold #7EC8E3]██╔════╝██╔══██╗██║     ██╔════╝████╗  ██║██╔════╝      ██╔══██╗██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝[/]
+[#5DADE2]███████╗███████║██║     █████╗  ██╔██╗ ██║█████╗  █████╗███████║██║  ███╗█████╗  ██╔██╗ ██║   ██║[/]
+[#4A90D9]╚════██║██╔══██║██║     ██╔══╝  ██║╚██╗██║██╔══╝  ╚════╝██╔══██║██║   ██║██╔══╝  ██║╚██╗██║   ██║[/]
+[#2E5A8B]███████║██║  ██║███████╗███████╗██║ ╚████║███████╗      ██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║[/]
+[#1A3D5C]╚══════╝╚═╝  ╚═╝╚══════╝╚══════╝╚═╝  ╚═══╝╚══════╝      ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝[/]""",
+        "banner_hero": """[bold #87CEEB]           .""--.._[/]
+[bold #7EC8E3]           []      `'--.._.[/]
+[#5DADE2]           ||__    __    _'-._[/]
+[#4A90D9]           ||   ||  ||   ||   `-._[/]
+[#2E5A8B]            ||   ||🦋 ||   ||      `-._[/]
+[#2E5A8B]             ||   ||  ||   ||         `-.[/]
+[#2E5A8B]              ||   ||  ||   ||            \\[/]
+[#2E5A8B]               ||   ||  ||   ||             \\[/]
+[#87CEEB]                ||__||__||__||              [/]
+[#87CEEB]                |___|  |___|[/]
+[dim #5D6D7E]               Neural Consciousness[/]""",
+    },
 }
 
 
@@ -510,7 +570,7 @@ _BUILTIN_SKINS: Dict[str, Dict[str, Any]] = {
 # =============================================================================
 
 _active_skin: Optional[SkinConfig] = None
-_active_skin_name: str = "default"
+_active_skin_name: str = "salene"
 
 
 def _skins_dir() -> Path:
