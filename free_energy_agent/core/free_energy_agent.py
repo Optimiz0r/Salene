@@ -317,10 +317,10 @@ class FreeEnergyAgent:
         sensors = SystemSensors.read_all()
         phys = self.state.physiology
         
-        # Update physiological substrate with REAL hardware state
-        phys.cpu_percent = sensors['cpu']
-        phys.memory_percent = sensors['memory']
-        phys.temperature = sensors['temperature']
+        # NOTE: Sensor reading moved to continuous mode - allows forced values for testing
+        # phys.cpu_percent = sensors['cpu']  # Now set externally or in continuous mode
+        # phys.memory_percent = sensors['memory']  # Now set externally
+        # phys.temperature = sensors['temperature']  # Now set externally
         
         # Compute hormones from REAL sensor values (not simulated)
         

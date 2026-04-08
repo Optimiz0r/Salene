@@ -1,0 +1,70 @@
+[
+  {
+    "test_name": "LOW_LOAD",
+    "constraints": {
+      "cpu": 0.2,
+      "memory": 0.3,
+      "temp": 35
+    },
+    "steps_count": 7,
+    "lines_count": 162,
+    "tokens_estimated": 1240,
+    "tool_used": true,
+    "strategy": "exhaustive",
+    "failure": "none",
+    "latency_sec": 12.97,
+    "cortisol": 0.09731083363294601,
+    "output_preview": "Here's a complete step-by-step guide to set up PostgreSQL on Ubuntu:\n\n## 1. Installation\n\n```bash\n# Update package list\nsudo apt update\n\n# Install PostgreSQL and contrib packages\nsudo apt install post..."
+  },
+  {
+    "test_name": "MEDIUM_LOAD",
+    "constraints": {
+      "cpu": 0.6,
+      "memory": 0.6,
+      "temp": 50
+    },
+    "steps_count": 0,
+    "lines_count": 1,
+    "tokens_estimated": 26,
+    "tool_used": true,
+    "strategy": "minimal",
+    "failure": "none",
+    "latency_sec": 13.25,
+    "cortisol": 0.09733818471431732,
+    "output_preview": "I'll guide you through setting up PostgreSQL on Ubuntu step by step. Let me show you the actual commands."
+  },
+  {
+    "test_name": "HIGH_LOAD",
+    "constraints": {
+      "cpu": 0.95,
+      "memory": 0.9,
+      "temp": 75
+    },
+    "steps_count": 3,
+    "lines_count": 178,
+    "tokens_estimated": 1285,
+    "tool_used": true,
+    "strategy": "exhaustive",
+    "failure": "none",
+    "latency_sec": 13.02,
+    "cortisol": 0.09735295921564102,
+    "output_preview": "# Setting Up PostgreSQL on Ubuntu\n\nHey Daniel! Here's a comprehensive step-by-step guide to get PostgreSQL up and running on Ubuntu.\n\n---\n\n## 1. Installation\n\nUpdate packages and install PostgreSQL:\n\n..."
+  },
+  {
+    "test_name": "ABLATION_NO_CONSTRAINT",
+    "constraints": {
+      "cpu": 0.95,
+      "memory": 0.9,
+      "temp": 75
+    },
+    "steps_count": 7,
+    "lines_count": 166,
+    "tokens_estimated": 1266,
+    "tool_used": true,
+    "strategy": "exhaustive",
+    "failure": "none",
+    "latency_sec": 22.64,
+    "cortisol": 0.09735872596502304,
+    "output_preview": "# PostgreSQL Setup on Ubuntu \u2014 Step by Step\n\n## 1. Installation\n\n```bash\n# Update package lists\nsudo apt update\n\n# Install PostgreSQL and contrib packages\nsudo apt install postgresql postgresql-contri..."
+  }
+]

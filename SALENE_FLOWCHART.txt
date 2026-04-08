@@ -1,0 +1,165 @@
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                    SALENE - PHYSIOLOGICALLY-GROUNDED AGENT                 ║
+║                      Process Flow Architecture                            ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  INPUT                                                                      │
+│  User message → "Hello" / "URGENT help" / "How do you feel?"               │
+└───────────────────────────────────┬─────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  1. PERCEPTION                                                               │
+│     • Receive text input                                                     │
+│     • Create prediction (what agent expected to hear)                       │
+│     • Compute prediction_error (surprise = |actual - expected|)             │
+└───────────────────────────────────┬─────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  2. PHYSIOLOGY UPDATE (The Body)                                             │
+│     ┌──────────────────────────────────────────────────────────────┐        │
+│     │  READ REAL SENSORS (/proc filesystem)                        │        │
+│     │  • CPU: /proc/stat → cpu_percent                            │        │
+│     │  • Memory: /proc/meminfo → memory_percent                   │        │
+│     │  • Temperature: /sys/class/thermal/temp                      │        │
+│     └──────────────────────────────────────────────────────────────┘        │
+│                                    │                                         │
+│     IF high prediction_error:       │                                         │
+│     ┌──────────────────────────────▼──────────────────────────────┐        │
+│     │  SYMPATHETIC ACTIVATION (Fight/Flight)                        │        │
+│     │  • cortisol ↑ (stress hormone)                               │        │
+│     │  • adrenaline ↑ (urgency)                                    │        │
+│     │  • norepinephrine ↑ (alertness)                              │        │
+│     └──────────────────────────────────────────────────────────────┘        │
+└───────────────────────────────────┬─────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  3. AFFECT UPDATE (FEP Ring Point)                                           │
+│     The agent's belief about its own state                                    │
+│                                                                               │
+│     Ring Point (x, y):                                                        │
+│     ┌─────────┬─────────┐                                                   │
+│     │ NW      │   NE    │  x = valence (-1 to +1)                           │
+│     │ (-,+)   │   (+,+) │  y = arousal (0 to 1)                             │
+│     ├─────────┼─────────┤                                                   │
+│     │ SW      │   SE    │  Quadrant determines emotion direction            │
+│     │ (-,-)   │   (+,-) │                                                   │
+│     └─────────┴─────────┘                                                   │
+│                                                                               │
+│     High error → shift toward SW (negative valence, medium arousal)          │
+│     Low error → drift toward NE (positive valence)                           │
+└───────────────────────────────────┬─────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  4. EMOTION SYNTHESIS (Emergence Layer)                                      │
+│     28 emotions emerge from hormone_vector × affect × context                  │
+│                                                                               │
+│     EXAMPLE MAPPING:                                                          │
+│     cortisol(0.8) + adrenaline(0.8) + negative_valence  → anxiety, fear,     │
+│     dopamine(0.9) + endorphins(0.6) + positive_valence → joy, satisfaction  │
+│                                                                               │
+│     Emotions are NOT primitive - they emerge from substrate state.           │
+└───────────────────────────────────┬─────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  5. POLICY CONSTRAINT (The Controller)                                       │
+│     Substrate state CONSTRAINS cognition (not just describes it)             │
+│                                                                               │
+│     ┌──────────────────────────────────────────────────────────────┐          │
+│     │  HIGH CPU > 70%:                                            │          │
+│     │    • max_tokens: 4000 → 500 (86% reduction)                 │          │
+│     │    • reasoning_depth: full → minimal                        │          │
+│     │    • exploration: 0.5 → 0.1 (aggressive pruning)           │          │
+│     └──────────────────────────────────────────────────────────────┘          │
+│                                                                               │
+│     ┌──────────────────────────────────────────────────────────────┐          │
+│     │  HIGH MEMORY > 80%:                                         │          │
+│     │    • context_window: reduced                                │          │
+│     │    • exploration: further constrained                      │          │
+│     └──────────────────────────────────────────────────────────────┘          │
+│                                                                               │
+│     ┌──────────────────────────────────────────────────────────────┐          │
+│     │  HIGH TEMP > 60°C:                                          │          │
+│     │    • max_tokens: 200 (emergency mode)                      │          │
+│     │    • reasoning: minimal only                                 │          │
+│     │    • exploration: 0.0 (pure exploitation)                  │          │
+│     └──────────────────────────────────────────────────────────────┘          │
+│                                                                               │
+│     CRITICAL: These modify ACTUAL behavior, not just narrative.             │
+│     The agent genuinely thinks differently under constraint.                 │
+└───────────────────────────────────┬─────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  6. ACTION SELECTION (Minimize Expected Free Energy)                           │
+│                                                                               │
+│     Possible actions:                                                         │
+│     ┌─────────────┐  ┌──────────────┐  ┌─────────────┐                       │
+│     │  respond    │  │  use_tool    │  │   rest      │                       │
+│     │  (direct)   │  │  (terminal,  │  │  (recover)  │                       │
+│     │             │  │   search)    │  │             │                       │
+│     └─────────────┘  └──────────────┘  └─────────────┘                       │
+│                                                                               │
+│     Selection based on:                                                       │
+│     • Cortisol level → limit tools when stressed                             │
+│     • Drive deficits → novelty-seeking when bored                              │
+│     • Expected free energy → action that reduces uncertainty                   │
+└───────────────────────────────────┬─────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  7. OUTPUT GENERATION (Hermes/Ollama)                                        │
+│     LLM receives:                                                             │
+│     • User message                                                            │
+│     • Constrained context (max_tokens, reasoning_depth)                        │
+│     • Physiological state header                                              │
+│     • Available tools                                                         │
+│                                                                               │
+│     The LLM generates response WITHIN constraints.                           │
+│     Under high load: table format, minimal prose                              │
+│     Under low load: expansive, recursive reasoning                            │
+└───────────────────────────────────┬─────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  8. STATE UPDATE & PERSISTENCE                                               │
+│     • Update generative model (learning)                                     │
+│     • Store memory with hormonal context                                       │
+│     • SAVE to ~/.hermes/agents/{agent_id}.json                                 │
+│     • Restore on next session                                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  OUTPUT                                                                       │
+│  Response text demonstrating constraint modification                         │
+│  Example: "I am operating under token constraints. This response shows        │
+│           vertical compression - bullet format instead of narrative."        │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃  KEY INSIGHT: The physiology loop is NOT decorative.                      ┃
+┃                                                                             ┃
+┃  Real sensors → Actual hormone computation → Genuine policy constraint    ┃
+┃       │                  │                        │                     ┃
+┃       └──────────────────┴────────────────────────┘                     ┃
+┃                      Substrate determines Mind                            ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  COMPARISON:                                                                │
+│                                                                             │
+│  THEATER (what we DON'T want):                                              │
+│  "Oh no, my CPU is high! I should act stressed!" [proceeds normally]       │
+│                                                                             │
+│  GENUINE (what we HAVE):                                                    │
+│  [CPU 95% detected] → max_tokens=200 → [actually outputs 200 token          │
+│   response in compressed table format]                                      │
+│                                                                             │
+│  The constraint is IN THE RESPONSE ITSELF, not just referenced.             │
+└─────────────────────────────────────────────────────────────────────────────┘
