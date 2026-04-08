@@ -13,6 +13,7 @@ import uuid
 import asyncio
 from datetime import datetime
 from typing import Dict, Any, Optional, List
+from ..sensors import SystemSensors
 from dataclasses import dataclass
 from pathlib import Path
 import importlib.util
@@ -93,7 +94,8 @@ class FreeEnergyAgent:
         self.created_at = datetime.now()
         self.last_active = datetime.now()
         
-        # ═══════════════════════════════════════════════════════
+
+# ═══════════════════════════════════════════════════════
         # NEUROBIT FOUNDATION: Physiological Substrate
         # ═══════════════════════════════════════════════════════
         self.state = unified_state or UnifiedState()
@@ -300,13 +302,27 @@ class FreeEnergyAgent:
     
     def _update_physiology(self, prediction_error: Dict[str, float]):
         """
-        Update physiological state based on prediction error
+        Update physiological state based on prediction error AND real sensors
         
         This is where the body responds to surprise:
         - High error → sympathetic activation (fight/flight)
         - Low error → parasympathetic (rest/digest)
+        
+        NOW WITH REAL HARDWARE SENSORS:
+        - /proc/stat for CPU
+        - /proc/meminfo for memory
+        - /sys/class/thermal for temperature
         """
+        # Read REAL sensors first
+        sensors = SystemSensors.read_all()
         phys = self.state.physiology
+        
+        # Update physiological substrate with REAL hardware state
+        phys.cpu_percent = sensors['cpu']
+        phys.memory_percent = sensors['memory']
+        phys.temperature = sensors['temperature']
+        
+        # Compute hormones from REAL sensor values (not simulated)
         
         # High total error → stress response
         total_error = prediction_error['total']
@@ -532,12 +548,13 @@ class FreeEnergyAgent:
         return str(filepath)
     
     @classmethod
-    def load(cls, filepath: str) -> 'FreeEnergyAgent':
+    def load(cls, filepath: str, config=None) -> 'FreeEnergyAgent':
         """
         Load agent from saved state.
         
         Args:
             filepath: Path to saved agent state
+            config: Optional AgentConfig (uses default if None)
             
         Returns:
             Restored FreeEnergyAgent instance
@@ -550,9 +567,12 @@ class FreeEnergyAgent:
             state_dict = json.load(f)
         
         # Create agent with saved identity
+        if config is None:
+            config = AgentConfig()
         agent = cls(
             agent_id=state_dict['agent_id'],
             name=state_dict['name'],
+            config=config,
         )
         
         # Restore physiology (hormones compute automatically from base state)
