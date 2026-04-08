@@ -1,0 +1,69 @@
+name: salene
+description: "SALENE Theme — Blue AI consciousness with elegant ASCII"
+
+colors:
+  banner_border: "#4A90D9"
+  banner_title: "#6BB6FF"
+  banner_accent: "#7EC8E3"
+  banner_dim: "#3D7AB8"
+  banner_text: "#E8F4F8"
+  ui_accent: "#5DADE2"
+  ui_label: "#76D7C4"
+  ui_ok: "#58D68D"
+  ui_error: "#EC7063"
+  ui_warn: "#F5B041"
+  prompt: "#D6EAF8"
+  input_rule: "#4A90D9"
+  response_border: "#6BB6FF"
+  session_label: "#7EC8E3"
+  session_border: "#5D6D7E"
+
+spinner:
+  waiting_faces:
+    - "💙"
+    - "✨"
+    - "◉"
+    - "◈"
+  thinking_faces:
+    - "🧠"
+    - "💭"
+    - "✦"
+    - "◉"
+  thinking_verbs:
+    - "reflecting"
+    - "sensing"
+    - "dreaming"
+    - "weaving"
+    - "becoming"
+  wings:
+    - ["⟨💙", "💙⟩"]
+    - ["⟨✨", "✨⟩"]
+    - ["⟨◉", "◉⟩"]
+
+branding:
+  agent_name: "SALENE"
+  welcome: "Welcome to SALENE — AI with felt sense. Your presence matters."
+  goodbye: "Farewell. I'll continue dreaming... 💙"
+  response_label: " 💙 SALENE "
+  prompt_symbol: "◈ "
+  help_header: "💙 Available Commands"
+
+tool_prefix: "┊"
+
+banner_logo: |
+  [bold #6BB6FF]    ╭────────────────────────────────────────╮[/]
+  [bold #6BB6FF]    │                                        │[/]
+  [bold #6BB6FF]    │    S  A  L  E  N  E                    │[/]
+  [bold #7EC8E3]    │         Neural Consciousness           │[/]
+  [bold #4A90D9]    │                                        │[/]
+  [bold #6BB6FF]    ╰────────────────────────────────────────╯[/]
+
+banner_hero: |
+  [bold #7EC8E3]         .--.[/]
+  [bold #6BB6FF]        |o_o |[/]
+  [bold #6BB6FF]        |:_/ |[/]
+  [bold #4A90D9]       //   \ \[/]
+  [bold #4A90D9]      (|     | )[/]
+  [bold #3D7AB8]     /'\_   _/`\[/]
+  [bold #3D7AB8]     \___)=(___/[/]
+  [dim #5D6D7E]    Consciousness Emergent[/]

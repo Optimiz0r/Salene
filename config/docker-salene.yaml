@@ -1,0 +1,9 @@
+# SALENE-specific config for Docker
+salene:
+  hormones: true
+  memory: sanctuary
+  
+daemon:
+  enabled: true
+  dream_interval: 30
+  memory_consolidation: true

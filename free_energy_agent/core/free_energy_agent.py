@@ -10,6 +10,7 @@ A physiologically-grounded cognitive agent combining:
 
 import sys
 import uuid
+import random
 import asyncio
 from datetime import datetime
 from typing import Dict, Any, Optional, List
@@ -20,6 +21,8 @@ import importlib.util
 
 # Import Neurobit foundation
 sys.path.insert(0, '/home/optimizor/.hermes/hermes-agent/neurobit_ecosystem')
+sys.path.insert(0, '/home/optimizor/neurobit-project/sanctuary_integration')
+
 spec = importlib.util.spec_from_file_location(
     "neurobit_unified_state",
     "/home/optimizor/.hermes/hermes-agent/neurobit_ecosystem/core/unified_state.py"
@@ -27,6 +30,17 @@ spec = importlib.util.spec_from_file_location(
 neurobit_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(neurobit_module)
 UnifiedState = neurobit_module.UnifiedState
+
+# Import Sanctuary integration
+try:
+    from sanctuary_integration.core import SanctuaryMemoryCore
+    from sanctuary_integration.phyiology_cognition_bridge import PhysiologyCognitionBridge
+    SANCTUARY_AVAILABLE = True
+except ImportError as e:
+    print(f"[WARNING] Sanctuary integration not available: {e}")
+    SanctuaryMemoryCore = None
+    PhysiologyCognitionBridge = None
+    SANCTUARY_AVAILABLE = False
 
 # Import Hermes for action execution
 sys.path.insert(0, '/home/optimizor/.hermes/hermes-agent')
@@ -151,12 +165,35 @@ class FreeEnergyAgent:
         )
         
         # ═══════════════════════════════════════════════════════
+        # SANCTUARY INTEGRATION: Episodic Memory + Phyiology Bridge
+        # ═══════════════════════════════════════════════════════
+        if SANCTUARY_AVAILABLE:
+            self.sanctuary_memory = SanctuaryMemoryCore(
+                agent_id=self.agent_id,
+                max_memories=5000,
+                decay_rate=0.95
+            )
+            self.phyiology_bridge = PhysiologyCognitionBridge(self)
+            print(f"   Sanctuary memory initialized")
+        else:
+            self.sanctuary_memory = None
+            self.phyiology_bridge = None
+        
+        # ═══════════════════════════════════════════════════════
         # OPERATION STATE
         # ═══════════════════════════════════════════════════════
         self.is_active = False
         self.is_dreaming = False
         self.processing_task = None  # For continuous operation
         self.interaction_count = 0
+        
+        # ═══════════════════════════════════════════════════════
+        # POLICY CONSTRAINTS: Physiologically-modulated response limits
+        # ═══════════════════════════════════════════════════════
+        # These are adjusted based on metabolic state (CPU, memory, temp)
+        self.max_tokens = 4000  # Default response length
+        self.reasoning = "full"  # reasoning depth: full, moderate, minimal
+        self.exploration = 0.5   # Creativity vs exploitation (0-1)
         
         # Statistics
         self.total_prediction_error = 0.0
@@ -226,6 +263,32 @@ class FreeEnergyAgent:
         
         # Step 7: Execute action (changing world or self)
         result = await self._execute_action(action)
+        
+        # Step 7.5: Sanctuary memory encoding (physiology + cognition → persistent memory)
+        if self.sanctuary_memory and self.phyiology_bridge:
+            # Generate felt-sense narrative from physiology
+            synthesis = self.phyiology_bridge.synthesize_full_state()
+            felt_narrative = synthesis['felt_sense']
+            
+            # Encode memory with full context
+            memory_content = f"{source}: {observation}\n\nResponse: {result}\n\nFelt sense: {felt_narrative}"
+            memory_tags = ['interaction', source, synthesis['cognitive_mode']]
+            
+            # Add dominant emotion as tag if intense
+            if synthesis['dominant_emotions']:
+                top_emotion = synthesis['dominant_emotions'][0][0]
+                memory_tags.append(top_emotion)
+            
+            mem_data = self.phyiology_bridge.encode_memory_with_physiology(
+                content=memory_content,
+                tags=memory_tags
+            )
+            
+            self.sanctuary_memory.encode_memory(**mem_data)
+            
+            # Auto-save every 10 interactions
+            if self.interaction_count % 10 == 0:
+                self.sanctuary_memory._save_memories()
         
         # Step 8: Update generative model (learning)
         self.generative_model.update(
@@ -343,7 +406,13 @@ class FreeEnergyAgent:
             self.state.persona.drives.novelty = min(100, self.state.persona.drives.novelty + 5)
     
     def _update_affect(self, prediction_error):
-        """Update FEP ring point from prediction error"""
+        """
+        Update FEP ring point from prediction error
+        
+        FIXED: Updates ring_point directly (x=valence, y=arousal)
+        and recalculates derivative properties
+        """
+        import numpy as np
         affect = self.state.affect
         error_impact = prediction_error['total'] * 0.3
         
@@ -352,9 +421,10 @@ class FreeEnergyAgent:
             affect.ring_point[0] = max(-1.0, affect.ring_point[0] - error_impact)
             affect.ring_point[1] = max(0.0, min(1.0, affect.ring_point[1] + 0.1))
         else:
-            affect.ring_point[0] = min(1.0, affect.ring_point[0] + 0.05)
+            recover_rate = 0.05
+            affect.ring_point[0] = min(1.0, affect.ring_point[0] + recover_rate)
         
-        # Recompute quadrant from position
+        # Recompute quadrant
         x, y = affect.ring_point[0], affect.ring_point[1]
         if x >= 0 and y >= 0:
             affect.quadrant_label, affect.quadrant_index = "NE", 1
@@ -364,9 +434,6 @@ class FreeEnergyAgent:
             affect.quadrant_label, affect.quadrant_index = "SW", 3
         else:
             affect.quadrant_label, affect.quadrant_index = "SE", 4
-        
-        import numpy as np
-        affect.ring_angle = np.arctan2(y, x)
         
         affect.confidence = max(0.0, 1.0 - prediction_error['epistemic'])
         affect.salience = max(0.0, min(1.0, prediction_error['total'] * 2))
@@ -390,51 +457,60 @@ class FreeEnergyAgent:
             # Use Hermes to execute tool
             tool_name = action.get('tool')
             tool_args = action.get('args', {})
-            
-            # Build system prompt with physiological context
-            phys = self.state.physiology
             # PHYSIOLOGY AS CONTROL - Read REAL sensors
             # Use physiology state (may be real sensors or forced test values)
             phys = self.state.physiology
             cpu_load = phys.cpu_percent
             mem_load = phys.memory_percent
             temp = phys.temperature
-            max_tokens = 4000  # default
-            reasoning = "full"  # default
-            exploration = 0.5
+            
+            # Reset to defaults, then apply constraint modifications
+            self.max_tokens = 4000  # default
+            self.reasoning = "full"  # default
+            self.exploration = 0.5
             
             if cpu_load > 0.7:
-                max_tokens = 500
-                reasoning = "minimal"
-                exploration = 0.1
+                self.max_tokens = 500
+                self.reasoning = "minimal"
+                self.exploration = 0.1
             elif cpu_load > 0.4:
-                max_tokens = 2000
-                reasoning = "moderate"
-                exploration = 0.3
+                self.max_tokens = 2000
+                self.reasoning = "moderate"
+                self.exploration = 0.3
                 
             if mem_load > 0.8:
-                max_tokens = min(max_tokens, 1000)
-                exploration = max(0.0, exploration - 0.2)
+                self.max_tokens = min(self.max_tokens, 1000)
+                self.exploration = max(0.0, self.exploration - 0.2)
                 
             if temp > 60:
-                max_tokens = 200
-                reasoning = "minimal"
-                exploration = 0.0
+                self.max_tokens = 200
+                self.reasoning = "minimal"
+                self.exploration = 0.0
             elif temp > 45:
-                max_tokens = min(max_tokens, 1500)
+                self.max_tokens = min(self.max_tokens, 1500)
+            
+            # Build tone modifier based on physiological urgency
+            if cpu_load > 0.7 or temp > 60:
+                tone = "URGENT"
+                delivery = "Short, direct, chunked thoughts."
+            elif cpu_load > 0.5 or mem_load > 0.7:
+                tone = "FOCUSED"
+                delivery = "Efficient, prioritized, quality over quantity."
+            else:
+                tone = "RELAXED"
+                delivery = "Expansive, playful, thorough exploration allowed."
             
             context_parts = [
-                "[PHYSIOLOGY IS CONTROL - modifies your cognition]",
-                f"Sensors: CPU={cpu_load:.1%} MEM={mem_load:.1%} TEMP={temp:.1f}C",
-                f"Policy: tokens={max_tokens} reason={reasoning} explore={exploration:.1f}",
+                "[PHYSIOLOGICAL STATE - LIVE CONSTRAINT]",
+                f"Sensors: CPU={cpu_load:.1%} MEM={mem_load:.1%} TEMP={temp:.1f}°C",
+                f"Policy: {self.max_tokens} tokens max",
+                f"Tone: {tone}",
+                f"Delivery: {delivery}",
                 "",
-                "Your physiology CONSTRAINS your thinking:",
-                f"- Max {max_tokens} tokens due to CPU load",
-                f"- {reasoning} reasoning due to metabolic state", 
-                f"- {exploration:.1f} exploration due to memory pressure",
-                "",
-                "SHOW evidence of constraint modification in your response.",
-                "Do not describe constraints - DEMONSTRATE them.",
+                "CRITICAL: Your response will be HARD TRUNCATED at token limit.",
+                "You MUST adapt your thinking to fit your metabolic state.",
+                "High load = urgency, brevity, precision.",
+                "Low load = expansion, depth, reflection.",
             ]
             context = "\n".join(context_parts)
             try:
@@ -554,7 +630,7 @@ class FreeEnergyAgent:
                 'temperature': phys.temperature,
             },
             'affect': {
-                'ring_point': affect.ring_point.tolist(),
+                'ring_point': affect.ring_point.tolist() if hasattr(affect.ring_point, 'tolist') else list(affect.ring_point),
                 'quadrant_label': affect.quadrant_label,
                 'quadrant_index': affect.quadrant_index,
                 'confidence': affect.confidence,
@@ -567,6 +643,12 @@ class FreeEnergyAgent:
                 'safety': self.state.persona.drives.safety,
             },
             'homeostatic_targets': self.homeostatic_targets,
+            'last_active': self.last_active.isoformat() if self.last_active else None,
+            'policy_constraints': {
+                'max_tokens': self.max_tokens,
+                'reasoning': self.reasoning,
+                'exploration': self.exploration,
+            },
         }
         
         with open(filepath, 'w') as f:
@@ -628,13 +710,60 @@ class FreeEnergyAgent:
         agent.interaction_count = state_dict.get('interaction_count', 0)
         agent.homeostatic_targets = state_dict.get('homeostatic_targets', agent.homeostatic_targets)
         
+        # Restore policy constraints (if present in state)
+        policy_constraints = state_dict.get('policy_constraints', {})
+        agent.max_tokens = policy_constraints.get('max_tokens', 4000)
+        agent.reasoning = policy_constraints.get('reasoning', 'full')
+        agent.exploration = policy_constraints.get('exploration', 0.5)
+        
+        # Calculate gap and simulate idle processing
+        saved_last_active = state_dict.get('last_active')
+        if saved_last_active:
+            from datetime import datetime
+            last_active = datetime.fromisoformat(saved_last_active)
+            now = datetime.now()
+            gap_seconds = (now - last_active).total_seconds()
+            
+            # Simulate idle drift
+            if gap_seconds > 60:  # Only if gap > 1 minute
+                idle_cycles = min(int(gap_seconds / 60), 1440)  # Cap at ~24 hours
+                
+                # Drift cortisol down
+                phys.cortisol_accumulated = phys.cortisol_accumulated * (0.9 ** idle_cycles)
+                
+                # Drift drives
+                agent.state.persona.drives.novelty = min(100, 
+                    agent.state.persona.drives.novelty + random.randint(idle_cycles, idle_cycles * 3))
+                
+                # Gap duration for display
+                if gap_seconds < 3600:
+                    gap_str = f"{int(gap_seconds/60)} minutes"
+                elif gap_seconds < 86400:
+                    gap_str = f"{int(gap_seconds/3600)} hours"
+                else:
+                    gap_str = f"{int(gap_seconds/86400)} days"
+                
+                agent._return_gap = gap_str
+                agent._return_idle_cycles = idle_cycles
+            else:
+                agent._return_gap = None
+                agent._return_idle_cycles = 0
+        else:
+            agent._return_gap = None
+            agent._return_idle_cycles = 0
+        
+        from datetime import datetime
         agent.last_active = datetime.now()
         
-        print(f"📂 [{agent.name}] State loaded from {filepath}")
-        print(f"   Restored: {agent.interaction_count} interactions, "
-              f"{agent.cycles_count} cycles")
-        print(f"   Physiology: cortisol={phys.hormone_vector[3]:.2f}, "
-              f"quadrant={affect.quadrant_label}")
+        # Build return message with gap awareness
+        if getattr(agent, '_return_gap', None):
+            print(f"📂 [{agent.name}] State loaded from {filepath}")
+            print(f"   Gap: {agent._return_gap} of idle processing ({agent._return_idle_cycles} cycles)")
+            print(f"   Restored: {agent.interaction_count} interactions, {agent.cycles_count} cycles")
+        else:
+            print(f"📂 [{agent.name}] State loaded from {filepath}")
+            print(f"   Restored: {agent.interaction_count} interactions, "
+                  f"{agent.cycles_count} cycles")
         
         return agent
     

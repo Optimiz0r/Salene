@@ -1,0 +1,15 @@
+# SALENE Docker Configuration
+agent:
+  mode: salene
+  name: Salene
+
+model:
+  default: "ollama/kimi-k2.5:cloud"
+  base_url: "http://ollama:11434/v1"
+  provider: "ollama"
+
+display:
+  skin: salene
+
+daemon:
+  enabled: true

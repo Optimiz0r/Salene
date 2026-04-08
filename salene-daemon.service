@@ -1,0 +1,33 @@
+[Unit]
+Description=SALENE Continuous Dream Daemon
+Documentation=file:///home/optimizor/neurobit-project/README.md
+After=network.target
+
+[Service]
+Type=simple
+User=optimizor
+Group=optimizor
+WorkingDirectory=/home/optimizor/neurobit-project
+
+# Use the virtual environment Python
+ExecStart=/home/optimizor/venv/bin/python3 /home/optimizor/neurobit-project/salene_daemon.py
+
+# Restart on failure
+Restart=on-failure
+RestartSec=10
+
+# Graceful shutdown
+TimeoutStopSec=30
+KillSignal=SIGTERM
+
+# Environment
+Environment="PATH=/home/optimizor/venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PYTHONUNBUFFERED=1"
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=salene-daemon
+
+[Install]
+WantedBy=multi-user.target

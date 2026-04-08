@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  salene:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: salene
+    restart: unless-stopped
+    
+    environment:
+      - PYTHONPATH=/app/salene:/app/hermes-agent
+      - SALENE_MODE=daemon
+      - OLLAMA_URL=${OLLAMA_URL:-http://host.docker.internal:11434/v1}
+    
+    volumes:
+      # Persist agent state and memories
+      - salene_data:/app/.hermes/agents
+      - salene_memories:/app/.hermes/sanctuary_memories
+      - salene_logs:/app/.hermes/logs
+      # Mount custom config (optional)
+      - ./config/salene.yaml:/app/.hermes/salene/config.yaml:ro
+    
+    networks:
+      - salene_network
+    
+    # For standalone mode without Ollama
+    # environment:
+    #   - SALENE_MODE=gateway
+    #   - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+    #   - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
+
+  # Optional: Ollama for local LLM
+  ollama:
+    image: ollama/ollama:latest
+    container_name: salene-ollama
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    networks:
+      - salene_network
+    profiles:
+      - ollama
+    # For GPU support:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - capabilities: [gpu]
+
+  # Optional: Gateway for platform integration
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: salene-gateway
+    restart: unless-stopped
+    command: python3 /app/salene/gateway_entry.py
+    environment:
+      - SALENE_MODE=gateway
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
+      - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}
+    depends_on:
+      - salene
+    networks:
+      - salene_network
+    profiles:
+      - gateway
+
+volumes:
+  salene_data:
+  salene_memories:
+  salene_logs:
+  ollama_data:
+
+networks:
+  salene_network:
+    driver: bridge

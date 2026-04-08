@@ -11,6 +11,34 @@ import numpy as np
 from datetime import datetime
 
 
+def get_circadian_baseline() -> Tuple[float, float]:
+    """
+    Calculate circadian hormone baselines based on time of day.
+    Returns (cortisol_baseline, melatonin_baseline)
+    """
+    hour = datetime.now().hour
+    
+    # Cortisol: peaks in morning (6-8am), lowest at midnight
+    if 6 <= hour <= 10:
+        cortisol = 0.6  # Morning peak
+    elif 11 <= hour <= 17:
+        cortisol = 0.4  # Afternoon moderate
+    elif 18 <= hour <= 22:
+        cortisol = 0.2  # Evening low
+    else:
+        cortisol = 0.1  # Night minimal
+    
+    # Melatonin: inverse - none during day, builds evening
+    if 6 <= hour <= 20:
+        melatonin = 0.0  # Daytime suppressed
+    elif 21 <= hour <= 23:
+        melatonin = 0.2  # Evening building
+    else:
+        melatonin = 0.4  # Night peak
+    
+    return cortisol, melatonin
+
+
 @dataclass
 class PhysiologicalState:
     """Layer 1: System physiology (from AI Ecosystem sensors)"""
@@ -19,6 +47,15 @@ class PhysiologicalState:
     temperature: float = 0.0
     network_latency_ms: float = 0.0
     timestamp: datetime = field(default_factory=datetime.now)
+    circadian_cortisol: float = field(default_factory=lambda: get_circadian_baseline()[0])
+    circadian_melatonin: float = field(default_factory=lambda: get_circadian_baseline()[1])
+    
+    # Persistent stress hormones (with decay)
+    cortisol_accumulated: float = 0.0  # Tracks stress over time (simulates half-life)
+    
+    # Allostatic load: accumulated "wear" from chronic stress
+    allostatic_load: float = 0.0  # 0-1, builds with repeated stress, decays slowly
+    stress_history_count: int = 0  # Count of stress events for habituation/sensitization
     
     # Derived "hormones" (from hormone_map in FEP v2)
     @property
@@ -51,17 +88,58 @@ class PhysiologicalState:
         return np.clip((self.cpu_percent * 0.5) + (self.network_latency_ms / 100), 0.0, 1.0)
     
     def _cortisol(self) -> float:
-        """Stress — increases with resource pressure"""
-        stress = (self.cpu_percent * 0.6) + (self.memory_percent * 0.4)
-        return np.clip(stress, 0.0, 1.0)
+        """Stress — with allostatic load (history structures present)"""
+        acute_stress = (self.cpu_percent * 0.6) + (self.memory_percent * 0.4)
+        
+        # Allostatic load: repeated stress accumulates "wear"
+        if acute_stress > 0.6:  # High stress threshold
+            self.stress_history_count += 1
+            self.allostatic_load = min(1.0, self.allostatic_load + 0.05)  # Builds slowly
+        else:
+            # Allostatic load decays VERY slowly (chronic takes time to recover)
+            self.allostatic_load = max(0.0, self.allostatic_load * 0.95)
+        
+        # Decay acute cortisol (10% per interaction)
+        self.cortisol_accumulated = self.cortisol_accumulated * 0.9
+        self.cortisol_accumulated = max(self.cortisol_accumulated, acute_stress * 0.8)
+        
+        # Calculate final with allostatic modulation
+        # Allostatic load primes the system - same stress feels different
+        # High allostatic load = lower threshold for stress response (sensitized)
+        # Many stress events = habituation (higher threshold needed)
+        if self.allostatic_load > 0.5:
+            # Sensitized: stressed system responds more to same input
+            effective_stress = acute_stress * 1.3
+            priming_note = " [sensitized]"
+        elif self.stress_history_count > 10:
+            # Habituated: experienced system has higher threshold
+            effective_stress = acute_stress * 0.7
+            priming_note = " [habituated]"
+        else:
+            effective_stress = acute_stress
+            priming_note = ""
+        
+        # Store priming state
+        self._priming = priming_note
+        
+        return np.clip(
+            max(self.cortisol_accumulated * 1.2, effective_stress, self.circadian_cortisol * 0.7),
+            0.0, 1.0
+        )
+    
+    def get_stress_priming(self) -> str:
+        """Get current stress priming state"""
+        return getattr(self, '_priming', "")
     
     def _adrenaline(self) -> float:
         """Urgency — spikes with high CPU or temp"""
         return np.clip(max(self.cpu_percent, self.temperature / 100), 0.0, 1.0)
     
     def _melatonin(self) -> float:
-        """Rest/relaxation — inverse of activity"""
-        return np.clip(1.0 - self.cpu_percent - (self.memory_percent * 0.3), 0.0, 1.0)
+        """Rest/relaxation — inverse of activity + circadian evening build"""
+        activity = np.clip(1.0 - self.cpu_percent - (self.memory_percent * 0.3), 0.0, 1.0)
+        # Blend with circadian melatonin
+        return np.clip(max(activity, self.circadian_melatonin), 0.0, 1.0)
     
     def _oxytocin(self) -> float:
         """Social/connection — baseline with slight activity correlation"""

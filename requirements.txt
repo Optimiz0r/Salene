@@ -1,0 +1,40 @@
+# SALENE Requirements
+# Python 3.8+ required
+
+# Core dependencies
+numpy>=1.21.0
+pyyaml>=5.4.0
+python-dateutil>=2.8.0
+
+# Neurophysiological computation
+scipy>=1.7.0
+
+# Sanctuary memory (optional - for semantic search)
+# sentence-transformers>=2.2.0
+# chromadb>=0.4.0
+
+# Vision (optional)
+opencv-python>=4.5.0
+pillow>=8.0.0
+
+# Voice (optional)
+SpeechRecognition>=3.8.0
+pyaudio>=0.2.11
+faster-whisper>=0.10.0
+
+# Platform integration (optional)
+python-telegram-bot>=20.0
+discord.py>=2.3.0
+slack-sdk>=3.21.0
+aiohttp>=3.8.0
+
+# MQTT/Home automation (optional)
+paho-mqtt>=1.6.0
+
+# Development/testing
+pytest>=7.0.0
+pytest-asyncio>=0.20.0
+
+# Documentation
+# sphinx>=4.0.0
+# sphinx-rtd-theme>=1.0.0
