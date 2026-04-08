@@ -1,0 +1,9 @@
+Fix needed:
+1. AgentConfig needs api_key field
+2. HermesAgent needs api_key="ollama"
+
+In free_energy_agent.py, AgentConfig class:
+Add: api_key: str = "ollama"
+
+In HermesAgent call (around line 118-120):
+Add: api_key=self.config.api_key,
