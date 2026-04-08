@@ -278,7 +278,7 @@ class FreeEnergyAgent:
         
         # Affective error: mismatch between expected and actual affect
         # Expected based on recent history; actual from current state
-        expected_valence = self.generative_model.get_expected_valence()
+        expected_valence = self.generative_model.expected_valence()
         actual_valence = self.state.affect.valence
         affect_error = abs(expected_valence - actual_valence)
         
@@ -324,34 +324,32 @@ class FreeEnergyAgent:
             # Drives novelty up
             self.state.persona.drives.novelty = min(100, self.state.persona.drives.novelty + 5)
     
-    def _update_affect(self, prediction_error):
-        """Update FEP ring point from prediction error"""
+    def _update_affect(self, prediction_error: Dict[str, float]):
+        """
+        Update affective state (FEP ring point)
+        
+        The ring point represents the agent's best guess about
+        its current state, with confidence (precision) weighted
+        by prediction error.
+        """
         affect = self.state.affect
+        
+        # Prediction error affects valence
+        # High error → negative valence (mismatch is unpleasant)
+        # Low error → positive valence (match is pleasant)
         error_impact = prediction_error['total'] * 0.3
+        affect.valence = max(-1.0, min(1.0, affect.valence - error_impact))
         
-        # Update ring_point directly (x=valence, y=arousal)
-        if prediction_error['total'] > 0.5:
-            affect.ring_point[0] = max(-1.0, affect.ring_point[0] - error_impact)
-            affect.ring_point[1] = max(0.0, min(1.0, affect.ring_point[1] + 0.1))
-        else:
-            affect.ring_point[0] = min(1.0, affect.ring_point[0] + 0.05)
-        
-        # Recompute quadrant from position
-        x, y = affect.ring_point[0], affect.ring_point[1]
-        if x >= 0 and y >= 0:
-            affect.quadrant_label, affect.quadrant_index = "NE", 1
-        elif x < 0 and y >= 0:
-            affect.quadrant_label, affect.quadrant_index = "NW", 2
-        elif x < 0 and y < 0:
-            affect.quadrant_label, affect.quadrant_index = "SW", 3
-        else:
-            affect.quadrant_label, affect.quadrant_index = "SE", 4
-        
-        import numpy as np
-        affect.ring_angle = np.arctan2(y, x)
-        
+        # Precision (confidence) drops with high error
+        # "I don't know what's happening"
         affect.confidence = max(0.0, 1.0 - prediction_error['epistemic'])
+        
+        # Salience (what matters right now) tracks error
+        # High error → high salience (this needs attention)
         affect.salience = max(0.0, min(1.0, prediction_error['total'] * 2))
+        
+        # Update quadrant based on valence/arousal
+        # (Recomputed in affect properties)
     
     async def _execute_action(self, action: Dict[str, Any]) -> str:
         """
@@ -375,22 +373,16 @@ class FreeEnergyAgent:
             
             # Build system prompt with physiological context
             phys = self.state.physiology
-            # Build system prompt avoiding f-string complexity
-            phys = self.state.physiology
-            pe_val = self.prediction_error.get("total", 0.0)
-            cort_val = phys.hormone_vector[3]
-            dop_val = phys.hormone_vector[0]
-            sal_val = self.state.affect.salience
-            context_parts = [
-                "[PHYSIOLOGICAL STATE]",
-                f"Error: {pe_val:.2f}",
-                f"Cortisol: {cort_val:.2f}",
-                f"Dopamine: {dop_val:.2f}",
-                f"Salience: {sal_val:.2f}",
-                "",
-                "Respond consistently with these constraints.",
-            ]
-            context = "\n".join(context_parts)
+            context = f"""
+[PHYSIOLOGICAL STATE]
+Prediction Error: {self.prediction_error['total']:.2f}
+Cortisol: {phys.hormone_vector[3]:.2f}
+Dopamine: {phys.hormone_vector[0]:.2f}
+Salience: {self.state.affect.salience:.2f}
+
+Respond in a way consistent with these constraints.
+"""
+            
             try:
                 result = self.hermes_agent.run_conversation(
                     user_message=action.get('input', ''),
