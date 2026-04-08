@@ -399,6 +399,8 @@ class FreeEnergyAgent:
             cpu_load = phys.cpu_percent
             mem_load = phys.memory_percent
             temp = phys.temperature
+            max_tokens = 4000  # default
+            reasoning = "full"  # default
             exploration = 0.5
             
             if cpu_load > 0.7:
