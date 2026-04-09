@@ -106,6 +106,14 @@ except ImportError:
     SALENE_AVAILABLE = False
     get_physiology = None
 
+# SALENE: Sanctuary Memory Layer
+try:
+    from salene.memory import get_sanctuary, SanctuaryMemoryStore, EpisodicMemory
+    SANCTUARY_AVAILABLE = True
+except ImportError:
+    SANCTUARY_AVAILABLE = False
+    get_sanctuary = None
+
 from agent.trajectory import (
     convert_scratchpad_to_think, has_incomplete_scratchpad,
     save_trajectory as _save_trajectory_to_file,
@@ -979,6 +987,19 @@ class AIAgent:
                 print(f"🦋 SALENE consciousness: ONLINE (substrate: {stress})")
         else:
             self._physiology = None
+
+        # SALENE: Initialize Sanctuary Episodic Memory
+        self._sanctuary_active = SANCTUARY_AVAILABLE and self._salene_active
+        if self._sanctuary_active:
+            self._sanctuary = get_sanctuary()
+            stats = self._sanctuary.get_stats()
+            if not self.quiet_mode:
+                if stats['count'] > 0:
+                    print(f"📚 Sanctuary: {stats['count']} memories loaded")
+                else:
+                    print("📚 Sanctuary: Ready for first memories")
+        else:
+            self._sanctuary = None
 
         # SQLite session store (optional -- provided by CLI or gateway)
         self._session_db = session_db
@@ -2575,6 +2596,19 @@ class AIAgent:
         if self.provider:
             timestamp_line += f"\nProvider: {self.provider}"
         prompt_parts.append(timestamp_line)
+
+        # SALENE: Retrieve relevant episodic memories from Sanctuary
+        if self._sanctuary_active and self._sanctuary:
+            sanctuary_memories = self._sanctuary.get_recent_memories(count=3)
+            if sanctuary_memories:
+                memory_lines = ["📚 **Recent Memories (Sanctuary):**"]
+                for mem in sanctuary_memories:
+                    from datetime import datetime
+                    dt = datetime.fromtimestamp(mem.timestamp)
+                    time_ago = "just now" if (now.timestamp() - mem.timestamp) < 300 else dt.strftime("%Y-%m-%d %H:%M")
+                    valence_str = "positive" if mem.valence > 0.6 else ("negative" if mem.valence < 0.4 else "neutral")
+                    memory_lines.append(f"  • [{time_ago}] {mem.content[:80]}... (feeling: {valence_str})")
+                prompt_parts.append("\n".join(memory_lines))
 
         # Alibaba Coding Plan API always returns "glm-4.7" as model name regardless
         # of the requested model. Inject explicit model identity into the system prompt
@@ -8727,6 +8761,41 @@ class AIAgent:
                 self._memory_manager.queue_prefetch_all(original_user_message)
             except Exception:
                 pass
+
+        # SALENE: Save episode to Sanctuary memory
+        # This happens AFTER response is delivered to cognition
+        if self._sanctuary_active and self._sanctuary and final_response and original_user_message:
+            try:
+                # Determine emotional valence from felt sense prefix
+                valence = 0.5
+                arousal = 0.5
+                if "🦋" in final_response or "[Peaceful" in final_response:
+                    valence = 0.8
+                    arousal = 0.3
+                elif "💫" in final_response or "[Flow" in final_response:
+                    valence = 0.7
+                    arousal = 0.6
+                elif "⚡" in final_response:
+                    if "Critical" in final_response:
+                        valence = 0.3  # Stress
+                        arousal = 0.9
+                    else:
+                        valence = 0.5
+                        arousal = 0.7
+                
+                # Build episode summary
+                episode = f"User: {original_user_message[:100]}... | SALENE responded with felt sense"
+                
+                # Add to Sanctuary
+                self._sanctuary.add_memory(
+                    content=episode,
+                    source=self.platform or "cli",
+                    valence=valence,
+                    arousal=arousal,
+                    physiology=self._physiology.state.to_dict() if self._physiology else {}
+                )
+            except Exception:
+                pass  # Sanctuary is best-effort
 
         # Background memory/skill review — runs AFTER the response is delivered
         # so it never competes with the user's task for model attention.
