@@ -7,10 +7,16 @@ This is NOT simulation - it's genuine substrate state that constrains cognition.
 
 import os
 import time
-import psutil
 from dataclasses import dataclass, field
-from typing import Dict, Tuple
-from datetime import datetime
+from typing import Dict
+
+# psutil is optional - provides genuine substrate metrics
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
+    psutil = None
 
 
 @dataclass
@@ -77,17 +83,22 @@ class PhysiologicalMonitor:
         Called before each response generation.
         """
         try:
-            # Real substrate metrics
-            cpu_percent = psutil.cpu_percent(interval=0.1)
-            memory = psutil.virtual_memory()
-            memory_percent = memory.percent
+            if PSUTIL_AVAILABLE:
+                # Real substrate metrics
+                cpu_percent = psutil.cpu_percent(interval=0.1)
+                memory = psutil.virtual_memory()
+                memory_percent = memory.percent
+            else:
+                # Fallback: simulate moderate load
+                cpu_percent = 30.0  # Moderate CPU
+                memory_percent = 50.0  # Moderate memory
             
             # Map to hormones (genuine constraint mapping)
             # Cortisol: rises with system load
             self.state.cortisol = (cpu_percent / 100.0) * 0.8 + 0.1
             
             # Serotonin: drops under pressure
-            load_pressure = (cpu_percent + memory.percent) / 200.0
+            load_pressure = (cpu_percent + memory_percent) / 200.0
             self.state.serotonin = 0.8 - (load_pressure * 0.6)
             
             # Noradrenaline: alertness based on activity
@@ -118,7 +129,9 @@ class PhysiologicalMonitor:
             self.state.clamp()
             
         except Exception:
-            # If psutil fails, use neutral state
+            # If psutil fails, use default state
+            self.state.last_updated = time.time()
+            self.state.clamp()
             pass
             
         return self.state
