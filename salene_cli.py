@@ -20,6 +20,7 @@ from pathlib import Path
 
 # Set SALENE configuration BEFORE importing Hermes
 os.environ.setdefault("HERMES_DEFAULT_SKIN", "salene")
+os.environ.setdefault("HERMES_AGENT_NAME", "SALENE")
 
 # Import Hermes main
 from hermes_cli.main import main as hermes_main

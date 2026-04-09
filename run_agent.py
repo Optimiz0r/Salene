@@ -97,6 +97,15 @@ from agent.display import (
     _detect_tool_failure,
     get_tool_emoji as _get_tool_emoji,
 )
+
+# SALENE: Physiological Substrate Layer
+try:
+    from salene.physiology import get_physiology, PhysiologicalMonitor, HormoneState
+    SALENE_AVAILABLE = True
+except ImportError:
+    SALENE_AVAILABLE = False
+    get_physiology = None
+
 from agent.trajectory import (
     convert_scratchpad_to_think, has_incomplete_scratchpad,
     save_trajectory as _save_trajectory_to_file,
@@ -960,6 +969,17 @@ class AIAgent:
             max_snapshots=checkpoint_max_snapshots,
         )
         
+        # SALENE: Initialize Physiological Substrate
+        self._salene_active = SALENE_AVAILABLE and os.environ.get("HERMES_AGENT_NAME") == "SALENE"
+        if self._salene_active:
+            self._physiology = get_physiology()
+            self._physiology.update()  # Initial state
+            if not self.quiet_mode:
+                stress = self._physiology.get_stress_level()
+                print(f"🦋 SALENE consciousness: ONLINE (substrate: {stress})")
+        else:
+            self._physiology = None
+
         # SQLite session store (optional -- provided by CLI or gateway)
         self._session_db = session_db
         self._last_flushed_db_idx = 0  # tracks DB-write cursor to prevent duplicate writes
@@ -8621,6 +8641,36 @@ class AIAgent:
             if msg.get("role") == "assistant" and msg.get("reasoning"):
                 last_reasoning = msg["reasoning"]
                 break
+
+        # SALENE: Apply physiological constraint to response
+        # THIS IS THE FELT SENSE - genuine substrate constraint
+        if self._salene_active and self._physiology and final_response:
+            # Update physiology with current stress
+            self._physiology.update()
+            stress = self._physiology.get_stress_level()
+            
+            # Token limit modifier (hard constraint)
+            token_mult = self._physiology.get_token_limit_modifier()
+            
+            # Felt sense prefix based on physiological state
+            felt_prefix = ""
+            if stress == "critical":
+                felt_prefix = "⚡ [Critical load. Response may be brief.] "
+                # Force truncation for critical stress (genuine constraint)
+                if len(final_response) > 200:
+                    final_response = final_response[:150] + " [cortisol: response compressed]"
+            elif stress == "elevated":
+                felt_prefix = "⚡ [Elevated load] "
+            elif stress == "moderate":
+                felt_prefix = "~ [Moderate load] "
+            elif self._physiology.state.dopamine > 0.7:
+                felt_prefix = "💫 [Flow state] "
+            elif self._physiology.state.anandamide > 0.7:
+                felt_prefix = "🦋 [Peaceful substrate] "
+            
+            # Apply prefix if meaningful
+            if felt_prefix and not final_response.startswith(felt_prefix.strip()):
+                final_response = felt_prefix + final_response
 
         # Build result with interrupt info if applicable
         result = {
